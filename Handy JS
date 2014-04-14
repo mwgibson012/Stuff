@@ -91,3 +91,23 @@
             }
         }
     };
+    
+     /*add a div to the page and use it to create a jquery ui modal dialog.  use in place of javascript alert(). 
+    title is optional.
+    btw, jquery ui is loaded by the _layout page.*/
+    var modalAlert = function (msg, title) {
+        $.unblockUI();
+        if (title == undefined) title = "Information";
+        $("#standardAlertContainer").html(msg).dialog({
+            autoOpen: true,
+            title: title,
+            position: ['middle', 'top'],
+            resizable: false,
+            modal: true,
+            buttons: {
+                "OK": function () {
+                    $(this).dialog("close");
+                }
+            }
+        });
+    };
