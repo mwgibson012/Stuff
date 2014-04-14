@@ -1,0 +1,57 @@
+ /***************************************************************
+    used to set a maximum length for text fields
+    idOfElement: id of the text element
+    maxLength: maximim number of characters that can be typed into the text element
+    removeAllSpaces:  Optional.  if true, uses regulare expression to remove all spaces from the elements.val()*/
+    var setMaxLength = function (idOfElement, maxLength, removeAllSpaces) {
+        var elmId = "#" + idOfElement;
+
+        $(document).on('keyup', elmId, function () {
+
+            if (removeAllSpaces != undefined && removeAllSpaces === true) {
+                $(this).val($(this).val().replace(/\s+/g, ''));
+            }
+            var ctrlVal = $(this).val();
+            var len = ctrlVal.length;
+
+            if (len > maxLength) {
+                var newstring = ctrlVal.substr(0, maxLength);
+                $(this).val(newstring);
+            }
+        });
+    };
+    
+      /*set even and  row background color in table */
+    var evenOdd = function (idOfTable, evenRowColor, oddRowColor) {
+        if (oddRowColor == undefined) {
+            oddRowColor = "#f0f0f0";
+        }
+        if (evenRowColor == undefined) {
+            evenRowColor = "#ffffff";
+        }
+        $("#" + idOfTable + " tr:even").not(":first").css("background-color", oddRowColor);
+        $("#" + idOfTable + " tr:odd").not(":first").css("background-color", evenRowColor);
+    };
+    
+     /*execute a function when enter key is pressed inside of control*/
+    var executeOnEnter = function (idOfControl, functionToExecute) {
+        try {
+            var ctrol = $(document).find("#" + idOfControl);
+            if (ctrol != undefined) {
+                $(document).find("#" + idOfControl).keypress(function(event) {
+                    if (event.which == 13) {
+                        functionToExecute();
+                    }
+                });
+            }
+        } catch (e) {
+            standardExceptionAlert(e);
+        }
+    };
+    
+      var printText = function(text) {
+        var w = window.open();
+        w.document.write(text);
+        w.print();
+        w.close();
+    };
