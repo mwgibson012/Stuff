@@ -1,0 +1,180 @@
+ public interface IGenericRepository<TEntity> where TEntity : class
+    {
+        void Delete(object id);
+        void Delete(TEntity entityToDelete);
+        void ExecuteCommand(string query);
+        IEnumerable<TEntity> ExecuteSql(string query);
+        IQueryable<TEntity> Find(Expression<Func<TEntity, bool>> expression = null);
+        TEntity FindById(object id);
+        TEntity Filter(Expression<Func<TEntity, bool>> expression = null);
+        void Insert(TEntity entity);
+        IQueryable<TEntity> SelectAll();
+        void Update(TEntity entityToUpdate);
+        void Update(string updateQuery);
+        void CloseConnection();
+
+        IQueryable<TEntity> SelectPage(string orderByColumName, int numOfRowsToSkip, int numOfRowsToTake, string sortOrder, out int rowCount);
+        IQueryable<TEntity> SelectPage(Expression<Func<TEntity, bool>> expression, string orderByColumName, int numOfRowsToSkip, int numOfRowsToTake, string sortOrder, out int rowCount);
+    
+    }
+    
+
+namespace RepositoryContract
+{
+    public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEntity : class
+    {
+        private readonly DbContext _context;
+        private readonly DbSet<TEntity> _dbSet;
+
+        public GenericRepository(DbContext context)
+        {
+            _context = context;
+            _dbSet = context.Set<TEntity>();
+        }
+
+        public virtual IQueryable<TEntity> SelectAll()
+        {
+            IQueryable<TEntity> query = _dbSet;
+            return query;
+        }
+
+        public virtual IQueryable<TEntity> Find(Expression<Func<TEntity, bool>> expression = null)
+        {
+            IQueryable<TEntity> query = _dbSet;
+            if (expression == null)
+                return query;
+            query = query.Where(expression);
+            return query;
+        }
+
+        public virtual TEntity FindById(object id)
+        {
+            return _dbSet.Find(id);
+        }
+
+        public virtual TEntity Filter(Expression<Func<TEntity, bool>> expression = null)
+        {
+            return Find(expression).FirstOrDefault();
+        }
+
+        public virtual void Insert(TEntity entity)
+        {
+            _dbSet.Add(entity);
+        }
+
+        public virtual void Delete(object id)
+        {
+            var entityToDelete = _dbSet.Find(id);
+            Delete(entityToDelete);
+        }
+
+        /// <summary>
+        /// execute sql delete, insert or update commands.
+        /// </summary>
+        /// <param name="query"></param>
+        public virtual void ExecuteCommand(string query)
+        {
+            if (query.Trim().StartsWith("SELECT", StringComparison.InvariantCultureIgnoreCase))
+            {
+                throw new Exception("Select statements are not allowed.");
+            }
+            _context.Database.ExecuteSqlCommand(query);
+        }
+
+        /// <summary>
+        /// Use this to select against a view just in case the dba's remove a table and replace
+        /// it with a view without telling anyone about what they are doing and breaking a whole bunch 
+        /// code.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        public virtual IEnumerable<TEntity> ExecuteSql(string query)
+        {
+            return _context.Database.SqlQuery<TEntity>(query);
+        }
+
+        public virtual void Delete(TEntity entityToDelete)
+        {
+             Detach(entityToDelete);
+            var entityState = _context.Entry(entityToDelete).State;
+
+            if (entityState == EntityState.Detached)
+            {
+                _dbSet.Attach(entityToDelete);
+            }
+
+            _dbSet.Remove(entityToDelete);
+        }
+
+        public virtual void Update(TEntity entityToUpdate)
+        {
+            Detach(entityToUpdate);
+            var entityState = _context.Entry(entityToUpdate).State;
+
+            if ( entityState == EntityState.Detached)
+            {
+                _dbSet.Attach(entityToUpdate);
+            }
+            _context.Entry(entityToUpdate).State = EntityState.Modified;
+        }
+
+        /// <summary>
+        /// Use this to update a table which has no primary key.
+        /// </summary>
+        /// <param name="updateQuery"></param>
+        public virtual void Update(string updateQuery)
+        {
+            _context.Database.ExecuteSqlCommand(updateQuery);
+        }
+
+        public virtual void CloseConnection()
+        {
+            _context.Dispose();
+        }
+
+
+        public void Detach(TEntity entity)
+        {
+            var objContext = ((IObjectContextAdapter)_context).ObjectContext;
+            var objSet = objContext.CreateObjectSet<TEntity>();
+            var entityKey = objContext.CreateEntityKey(objSet.EntitySet.Name, entity);
+
+            Object foundEntity;
+            var exists = objContext.TryGetObjectByKey(entityKey, out foundEntity);
+
+            // TryGetObjectByKey attaches a found entity
+            // Detach it here to prevent side-effects
+            if (exists)
+            {
+                objContext.Detach(foundEntity);
+            }
+
+        }
+
+        public IQueryable<TEntity> SelectPage(string orderByColumName, int numOfRowsToSkip, int numOfRowsToTake, string sortOrder, out int rowCount)
+        {
+            var sort = sortOrder == "Ascending" ? string.Empty : " desc";
+            IQueryable<TEntity> query = _dbSet;
+
+            var ret = query.OrderBy(orderByColumName + sort);
+            rowCount = ret.Count();
+
+            return ret.Skip(numOfRowsToSkip).Take(numOfRowsToTake);
+        }
+
+
+        public IQueryable<TEntity> SelectPage(Expression<Func<TEntity, bool>> whereClause, string orderByColumName, int numOfRowsToSkip, int numOfRowsToTake, string sortOrder, out int rowCount)
+        {
+            var sort = sortOrder == "Ascending" ? string.Empty : " desc";
+            IQueryable<TEntity> query = _dbSet;
+
+            var ret = whereClause != null ? 
+                query.Where(whereClause).OrderBy(orderByColumName + sort) :
+                query.OrderBy(orderByColumName + sort);
+            rowCount = ret.Count();
+
+            return ret.Skip(numOfRowsToSkip).Take(numOfRowsToTake);
+        }
+     
+    }
+}
