@@ -55,3 +55,39 @@
         w.print();
         w.close();
     };
+
+
+  /******************************************************************
+  modalAlert is block UI.  Replace modalAlert if not needed with something else.
+    provide standard way to handle ajax errors*/
+    var handleAjaxError = function (xhr, exception, errorFunction) {
+        if (exception == 'timeout') {
+            modalAlert('Your session has ended. Session Exception.');
+        } else if (xhr.status == 404) {
+            if (exception == undefined) {
+                modalAlert('Requested page not found. \nAn error occurred but did not return a javascript exception message body.', '404');
+            } else {
+                modalAlert('Requested page not found. ' + exception.message, '404');
+            }
+        } else if (xhr.status == 500) {
+            if (exception == undefined) {
+                modalAlert('Unable to find resource. ', '500');
+            } else {
+                modalAlert('Unable to find resource. ' + exception.message, '500');
+            }
+        } else if (exception === 'parsererror') {
+            modalAlert('Requested JSON parse failed.', 'parsererror');
+        } else {
+            if (errorFunction === null || errorFunction === undefined || errorFunction.length < 1) {
+
+                if (exception == undefined) {
+                    modalAlert("Unable to complete operation.\nAn error occurred but did not return a javascript exception message body.", 'Error');
+                } else {
+                    modalAlert("Unable to complete operation.  \nMessage:\n" + exception.message + "\nStatus:" + xhr.status, 'Error');
+                    window.location.href = relPath("Home/Index");
+                }
+            } else {
+                errorFunction();
+            }
+        }
+    };
