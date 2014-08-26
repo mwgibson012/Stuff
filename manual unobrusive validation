@@ -1,0 +1,91 @@
+(function (carBuy, $, undefined) {
+    //works with unobtrusive validation to handle manually generated validation errors.
+    //call initializeValidation to setup and start error handling.
+    carBuy.Validation = function () {
+        //array of ValidationObj objects
+        var errorArray;
+        //form which contains the elements to be validated
+        var theForm;
+
+        /*initializes the error handling.  
+            idAndMessageArray:  carBuy.Validation.ValidationObj array
+            formId: id of containing form.  
+            ex: "mainForm"  [NOT: "#mainForm" or $("#mainForm")]*/
+        var init = function (validationObjArray, formId) {
+            errorArray = validationObjArray;
+            theForm = $("#" + formId);
+            setError();
+        };
+        //clears all errors and nulls the internal json error object.
+        var clearAllErrors = function () {
+            errorArray = null;
+            clearAllUnobtrusiveErrors();
+        };
+        //removes an error from a specified element
+        //elementId:  id of element whose error is to be removed  
+        //Ex: "YardObject_Id"  [NOT: "#YardObject_Id" or $("#YardObject_Id)]
+        var clearError = function (elementId) {
+            carBuy.clearMainDisplay();
+            if (errorArray && errorArray.length > 0) {
+                findAndRemove(errorArray, "Id", elementId);
+            }
+            var inputSelector = "#" + elementId;
+            var valSpan = "span[data-valmsg-for='" + elementId + "']";
+            $(inputSelector).addClass('input-validation-valid');
+            $(inputSelector).removeClass("input-validation-error");
+            $(valSpan).addClass("field-validation-valid");
+            $(valSpan).removeClass("field-validation-error");
+            setError();
+        };
+        //sets errors by spinning the json object and using the contained id's and error messages
+        //to set unobtrusive validation errors and to write error messages to the main display
+        var setError = function () {
+            var summary = '';
+            var validationObj = {};
+            if (errorArray) {
+                $.each(errorArray, function (idx, item) {
+                    summary += "<div>" + item.Msg + "<div>";
+                    validationObj[item.Id] = item.Msg;
+                });
+                theForm.validate().showErrors(validationObj);
+                carBuy.setMainDisplay(summary, false, true);
+            } else {
+                clearAllErrors();
+            }
+        };
+        //clear unobtrusive validation errors
+        var clearAllUnobtrusiveErrors = function () {
+            //Removes validation from input-fields
+            $('.input-validation-error').addClass('input-validation-valid');
+            $('.input-validation-error').removeClass('input-validation-error');
+            //Removes validation message after input-fields
+            $('.field-validation-error').addClass('field-validation-valid');
+            $('.field-validation-error').removeClass('field-validation-error');
+            //Removes validation summary 
+            $('.validation-summary-errors').addClass('validation-summary-valid');
+            $('.validation-summary-errors').removeClass('validation-summary-errors');
+            carBuy.clearMainDisplay();
+        };
+        //find and then remove the element id from the validation array
+        var findAndRemove = function (array, property, value) {
+            $.each(array, function (index, result) {
+                if (result && result[property] == value) {
+                    array.splice(index, 1);
+                }
+            });
+        };
+        //public functions
+        return {
+            removeElementError: clearError,
+            removeAllErrors: clearAllErrors,
+            initializeValidation: init
+        };
+    }();
+})
+(window.carBuy = window.carBuy, jQuery);
+
+//object used by carBuy validation to hold element id's and error messages.
+carBuy.Validation.ValidationObj = function (id, msg) {
+    this.Id = id;
+    this.Msg = msg;
+};
