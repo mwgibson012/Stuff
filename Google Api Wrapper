@@ -1,0 +1,292 @@
+Enter file contents here(function (carBuy, $, undefined) {
+    /*
+    required to load scripts
+
+    @section scripts{
+        @Scripts.Render("~/bundles/google")
+        <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false&key=AIzaSyDEP2ipJHueCJmiHjXi1hshO447FwixTHo"></script>
+     }
+
+    */
+    carBuy.googleApi = function () {
+        var badDistance = 'No Distance Found';
+        //container for results of multiple api calls
+        var apiRows = [];
+        //holds highest yard group number for multiple api calls
+        var lastGroupNumber = -1;
+        //all yards passed in as function argument
+        var allYards = [];
+        //drop down which holds the distances for each yard during multiple api calls
+        var dropDownForPostalDistances;
+        //element whose html displays the distance found from a single origin to a single destination
+        var addressDistanceSelector;
+        //selector of elements to disable during call
+        var blockingSelector;
+        
+        //google api call fell down
+        function badDistanceStatus(status) {
+            if (status == google.maps.DistanceMatrixStatus.INVALID_REQUEST) {
+                carBuy.setMainDisplay('Unable to determine distance. Invalid Request.', false);
+            } else if (status == google.maps.DistanceMatrixStatus.MAX_ELEMENTS_EXCEEDED) {
+                carBuy.setMainDisplay('Unable to determine distance. Max Elements Exceeded.', false);
+            } else if (status == google.maps.DistanceMatrixStatus.OVER_QUERY_LIMIT) {
+                carBuy.setMainDisplay('Unable to determine distance. Over Query Limit. ', false);
+            } else if (status == google.maps.DistanceMatrixStatus.REQUEST_DENIED) {
+                carBuy.setMainDisplay('Unable to determine distance. Request Denied.', false);
+            } else if (status == google.maps.DistanceMatrixStatus.UNKNOWN_ERROR) {
+                carBuy.setMainDisplay('Unable to determine distance. Unknown Error.', false);
+            } else {
+                if (status == undefined) {
+                    status = "Unable to determine distance. Api Error";
+                }
+                carBuy.setMainDisplay('Unable to determine distance. ' + status, false);
+            }
+        }
+
+        function setAllYards(allYardsJson) {
+            allYards = [];
+            var cnt = 1;
+            var groupNumber = 1;
+            $.each(JSON.parse(allYardsJson), function (idx, item) {
+                if (cnt == 24) {
+                    groupNumber++;
+                    cnt = 1;
+                }
+                allYards.push({
+                    YardId: item.YardId,
+                    YardCode: item.YardCode,
+                    YardName: item.YardName,
+                    Address: item.Address,
+                    Latitude: item.Latitude,
+                    Longitude: item.Longitude,
+                    ApiAddress: '',
+                    ApiTravelTime: '',
+                    ApiDistance: '',
+                    ActualDistance: '',
+                    GroupNumber: groupNumber
+                });
+                cnt++;
+            });
+        }
+        //get distances to all yards from a postal code
+        //postal code- zip code
+        //dropDownForPostalDistances- the html select which will hold the yards sorted by distances
+        /*allYardsJson=array of json objects  of format:        
+                          {YardId:value,
+                          YardCode:value
+                          YardName:value,
+                          Address:value,
+                          Latitude:value,
+                          Longitude:value   
+          blockSelector - jquery wrapped element to be disabled
+                          */
+        var setDistancesToAllYardsByPostalCode = function (postalCode, dropDownSelector, allYardsJson, blockSelector) {
+            blockingSelector = blockSelector;
+            executeBlock(true);
+            setAllYards(allYardsJson);
+            dropDownForPostalDistances = $(dropDownSelector);
+            dropDownForPostalDistances.find("option").remove();
+            if (postalCode == undefined) {
+                $(dropDownForPostalDistances).append($("<option value=''>---</option>"));
+                $.each(allYards, function (idx, curYard) {
+                    var optionText = curYard.YardCode + " - " + curYard.YardName;
+                    $(dropDownForPostalDistances).append($("<option></option>")
+                        .attr("value", curYard.YardId)
+                        .text(optionText));
+                });
+                return;
+            }
+            executeBlock(true);
+            //initialize global variables
+            lastGroupNumber = -1;
+            apiRows = [];
+            lastGroupNumber = undefined;
+
+            //arrays to hold data sent to api
+            var origins = [];
+            var destinations = [];
+            origins.push(postalCode);
+            //yards are grouped by GroupNumber.  get the highest group number 
+            lastGroupNumber = allYards[allYards.length - 1].GroupNumber;
+            //get groups of yards
+            for (var i = 1; i <= lastGroupNumber; i++) {
+                var curItems = $.grep(allYards, function (e) {
+                    return e.GroupNumber == i;
+                });
+                //create a destination array by yard group
+                $.each(curItems, function (index, currentItem) {
+                    var latitude = currentItem.Latitude;
+                    var longitude = currentItem.Longitude;
+
+                    var latlng = new google.maps.LatLng(latitude, longitude);
+                    destinations.push(latlng);
+                });
+                //ask google for distances
+                callDistanceMatrixService(origins, destinations, postalcodecallback);
+                //have to set a delay or google will return an error for not enough time between calls.
+                setInterval(function () { }, 150);
+                destinations = [];
+            }
+
+        };
+        //wrapper for google distance api call
+        var callDistanceMatrixService = function (origins, destinations, callbackFunction) {
+            var service = new google.maps.DistanceMatrixService();
+            service.getDistanceMatrix(
+            {
+                origins: origins,
+                destinations: destinations,
+                travelMode: google.maps.TravelMode.DRIVING,
+                unitSystem: google.maps.UnitSystem.IMPERIAL,
+                avoidHighways: false,
+                avoidTolls: false
+            }, callbackFunction);
+        }
+
+        //callback used when finding distances by a postal code
+        function postalcodecallback(response, status) {
+            executeBlock(false);
+            if (status != google.maps.DistanceMatrixStatus.OK || lastGroupNumber == -1) {
+                lastGroupNumber = -1;
+                badDistanceStatus(status);
+                return null;
+            }
+            lastGroupNumber = lastGroupNumber - 1;
+            apiRows.push(response);
+            //group counter is zero.  that means all api calls have returned.  
+            if (lastGroupNumber == 0) {
+                var apiDataContainer = [];
+                for (var ii = 0; ii < apiRows.length; ii++) {
+                    var currentResponse = apiRows[ii];
+                    var destinations = currentResponse.destinationAddresses;
+                    var origins = currentResponse.originAddresses;
+                    for (var i = 0; i < origins.length; i++) {
+                        var results = currentResponse.rows[i].elements;
+                        for (var j = 0; j < results.length; j++) {
+                            var element = results[j];
+                            if (element.status == "OK") {
+                                var distance = element.distance == undefined ? badDistance : element.distance.text;
+                                var duration = element.duration == undefined ? ' ' : element.duration.text;
+                                //var from = origins[i];
+                                var to = destinations[j];
+                                var distanceSplit = distance.split(' ');
+                                //if miles uses api distance, if feet set to zero
+                                var acutalDistance = distanceSplit[1].trim() == "mi" ? distanceSplit[0].trim() : badDistance;
+                                apiDataContainer.push({ ApiAddress: to, ApiTravelTime: duration, ApiDistance: distance, ActualDistance: acutalDistance });
+                            } else {
+                                apiDataContainer.push({ ApiAddress: "Invalid Address", ApiTravelTime: "Invalid Travel Time", ApiDistance: "Invalid Distance", ActualDistance: badDistance });
+                            }
+                        }
+                    }
+                }
+                apiRows = [];
+                lastGroupNumber = -1;
+                //This matches yard data to distance data returned from the api.
+                //There is no way to match yard data to api data other than how they both are ordered in their respective arrays. 
+                //The api responses need to arrive in the exact order as they were sent.  Also, the destination addresses within each response must
+                //arrive in the exact order they were sent.  If these two conditions are not met the distances for the yard destinations will be off.
+                for (var idxYard = 0; idxYard < allYards.length; idxYard++) {
+                    var apiDistance = apiDataContainer[idxYard].ApiDistance;
+                    var apiDuration = apiDataContainer[idxYard].ApiDuration;
+                    var actualDistance = apiDataContainer[idxYard].ActualDistance;
+                    var apiAddress = apiDataContainer[idxYard].ActualDistance;
+                    allYards[idxYard].ApiDistance = apiDistance;
+                    allYards[idxYard].ApiDuration = apiDuration;
+                    allYards[idxYard].ActualDistance = actualDistance;
+                    allYards[idxYard].ApiAddress = apiAddress;
+                };
+                //sort the yards by distance
+                allYards.sort(function (a, b) {
+                    var aInt = parseInt(a.ActualDistance.replace(/,/g, ""));
+                    var bInt = parseInt(b.ActualDistance.replace(/,/g, ""));
+                    if (isNaN(aInt)) {
+                        aInt = 9999999;
+                    }
+                    if (isNaN(bInt)) {
+                        bInt = 9999999;
+                    }
+                    return aInt < bInt ? -1 : aInt > bInt ? 1 : 0;
+                });
+                //populate drop down with yards sorted by distance
+                $(dropDownForPostalDistances).append($("<option value=''>---</option>"));
+                $.each(allYards, function (idx, curYard) {
+                    var optionText = curYard.YardCode + " - " + curYard.YardName + " - " + curYard.ApiDistance;
+                    $(dropDownForPostalDistances).append($("<option></option>")
+                        .attr("value", curYard.YardId)
+                        .text(optionText));
+                });
+            };
+            //be quiet resharper
+            return true;
+        };
+
+        //using google api gets distance from an origin to a destination.
+        //origin can be an address or a zip code.  address is recommended.
+        //destination must be a longitude and latitude pair
+        //distanceContainerSelector- the jquery selector for an element whose html will contain the distance returned from the api call.must be an element that jquery .html() will work
+        // blockSelector - jquery wrapped element to be disabled
+        var getDistanceFromOriginToDestination = function (origin, destinationLongitude, destinationLatitude, distanceContainerSelector, blockSelector) {
+            blockingSelector = blockSelector;
+            executeBlock(true);
+            //$(distanceContainerSelector).html("Calculating Distance....Please Wait");
+            if (!origin || !destinationLatitude || !destinationLongitude || !distanceContainerSelector) {
+                carBuy.setMainDisplay("Unable to determine distance.  On or more inputs are missing.");
+                return;
+            }
+          
+            addressDistanceSelector = distanceContainerSelector;
+            var origins = [];
+            var destinations = [];
+            origins.push(origin);
+            destinations.push(new google.maps.LatLng(destinationLatitude, destinationLongitude));
+            callDistanceMatrixService(origins, destinations, getDistanceFromOriginToDestinationCallback);
+        };
+
+        //api callback for determining distance of a single origin to a single destination
+        //uses the addressDistanceSelector variable.  this variable is a jquery selector
+        //for the element which displays the distance returned.
+        function getDistanceFromOriginToDestinationCallback(response, status) {
+            executeBlock(false);
+            if (status != 'OK') {
+                badDistanceStatus(status);
+                return;
+            }
+            var distanceSet = false;
+            var origins = response.originAddresses;
+            for (var i = 0; i < origins.length; i++) {
+                var results = response.rows[0].elements;
+                for (var j = 0; j < results.length; j++) {
+                    var element = results[j];
+                    var distance = element.distance == undefined ? badDistance : element.distance.text;
+                    $(addressDistanceSelector).html(distance);
+                    distanceSet = true;
+                    break;
+                }
+            }
+            if (!distanceSet) {
+                addressDistanceSelector.html('Not found');
+            }
+        }
+
+        this.executeBlock = function (isBlocking) {
+                if (isBlocking) {
+                    $('#BusyContainer').show();
+                    if (blockingSelector != undefined) {
+                        blockingSelector.attr('disabled', 'disabled');
+                    }
+                } else {
+                    if (blockingSelector != undefined) {
+                        blockingSelector.removeAttr('disabled');
+                    }
+                    $('#BusyContainer').hide();
+                }
+        };
+
+        //return functions
+        return {
+            setDistancesToAllYardsByPostalCode: setDistancesToAllYardsByPostalCode,
+            getDistanceFromOriginToDestination: getDistanceFromOriginToDestination
+        };
+        //end google api
+    }();
+}(window.carBuy = window.carBuy || {}, jQuery));
