@@ -1,0 +1,558 @@
+using System.Collections.Generic;
+using System.Linq;
+using CarBuy.Core.CarBuyDataAccess;
+using CarBuy.Core.Managers;
+using CarBuy.Core.Managers.Interfaces;
+using CarBuy.Core.Services.Interfaces;
+using CarBuy.Entity.DTO;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+
+namespace CarBuy.Test
+{
+    [TestClass]
+    public class QuoteUnitTest
+    {
+        private readonly Mock<IQuoteService> _mockQuoteService;
+        private readonly Mock<IVehicleStandardization> _mockVehicleStandardization;
+        private IQuote _quote;
+
+        public QuoteUnitTest()
+        {
+            _mockQuoteService = new Mock<IQuoteService>();
+            _mockVehicleStandardization = new Mock<IVehicleStandardization>();
+        }
+
+        [TestMethod]
+        public void AddUpdateQuote_AssertQuoteNumberAssigned()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.AddUpdateQuote(It.IsAny<Quote>())).Returns(new QuoteResponse {
+                    ResponseData = new Quote {
+                        QuoteNumber = "5096"
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.AddUpdateQuote(new QuoteEntity());
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, "5096");
+        }
+
+        [TestMethod]
+        public void AddUpdateQuote_AssertErrors()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.AddUpdateQuote(It.IsAny<Quote>())).Returns(new QuoteResponse
+            {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "Error"
+                        }
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.AddUpdateQuote(new QuoteEntity());
+            //Assert
+            Assert.AreEqual(quote.ErrorMessages[0], "Error");
+        }
+        
+        [TestMethod]
+        public void GetFullQuoteByQuoteNumberOrId_AssertErrorsReturnEmptyQuote()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetFullQuoteByQuoteNumberOrId(It.IsAny<string>(), It.IsAny<long?>())).Returns(new FullQuoteResponse {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "Error"
+                        }
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            
+            //Act
+            var quote = _quote.GetFullQuoteByQuoteNumberOrId("5096", 1);
+            
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, null);
+        }
+
+        [TestMethod]
+        public void GetFullQuoteByQuoteNumberOrId_AssertDeductions()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetFullQuoteByQuoteNumberOrId(It.IsAny<string>(), It.IsAny<long?>())).Returns(new FullQuoteResponse
+            {
+                ResponseData = new FullQuote {
+                    QuoteNumber = "5096",
+                    ID = 1,
+                    QuoteDeductionList = new QuoteDeductionList {
+                        QuoteDeductions  = new ArrayOfQuoteDeductionQuoteDeduction1 {
+                            new QuoteDeduction {
+                                Amount = 145,
+                            }
+                        }
+                    },
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.GetFullQuoteByQuoteNumberOrId("5096", 1);
+            //Assert
+            Assert.AreEqual(quote.Deductions.First().Amount, 145);
+        }
+
+        [TestMethod]
+        public void SearchQuote_AssertErrorsReturnEmptyListQuote()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.SearchQuote(It.IsAny<SearchQuoteRequest>())).Returns(new QuoteListResponse {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "Error"
+                        }
+                    } 
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.SearchQuote(new QuoteSearchEntity());
+            //Assert
+            Assert.AreEqual(quote.Count, 0);
+        }
+
+        [TestMethod]
+        public void SearchQuote_AssertListReturned()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.SearchQuote(It.IsAny<SearchQuoteRequest>())).Returns(new QuoteListResponse {
+                    ResponseData = new QuoteList {
+                        Quotes = new ArrayOfQuoteQuote {
+                            new Quote {
+                                QuoteNumber = "5096"
+                            }
+                        }
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.SearchQuote(new QuoteSearchEntity());
+            //Assert
+            Assert.AreEqual(quote.First().QuoteNumber, "5096");
+        }
+
+        [TestMethod]
+        public void GetQuoteByQuoteNumberOrId_AssertErrorsReturnEmptyQuote()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteByQuoteNumberOrId(It.IsAny<string>(), It.IsAny<long?>())).Returns(new FullQuoteResponse
+            {
+                Errors = new ArrayOfErrorMessageErrorMessage1 {
+                    new ErrorMessage {
+                        Description = "Error"
+                    }
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.GetQuoteByQuoteNumberOrId("5096", 1);
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, null);
+        }
+
+        [TestMethod]
+        public void GetQuoteByQuoteNumberOrId_AssertDeductionsNull()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteByQuoteNumberOrId(It.IsAny<string>(), It.IsAny<long?>())).Returns(new FullQuoteResponse
+            {
+                ResponseData = new FullQuote
+                {
+                    QuoteNumber = "5096",
+                    ID = 1,
+                    QuoteDeductionList = new QuoteDeductionList {
+                        QuoteDeductions = new ArrayOfQuoteDeductionQuoteDeduction1 {
+                            new QuoteDeduction {
+                                Amount = 145,
+                            }
+                        }
+                    },
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.GetQuoteByQuoteNumberOrId("5096", 1);
+            //Assert
+            Assert.AreEqual(quote.Deductions.Count, 0);
+        }
+
+        [TestMethod]
+        public void GetQuoteByQuoteNumberOrId_AssertQuoteReturned()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteByQuoteNumberOrId(It.IsAny<string>(), It.IsAny<long?>())).Returns(new FullQuoteResponse
+            {
+                ResponseData = new FullQuote {
+                    QuoteNumber = "5096",
+                    ID = 1
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.GetQuoteByQuoteNumberOrId("5096", 1);
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, "5096");
+        }
+
+        [TestMethod]
+        public void CalculatedQuoteByQuoteNumber_AssertErrorReutrnOnlyQuoteNumber()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.CalculatedQuoteByQuoteNumber(It.IsAny<string>())).Returns(new CalculatedQuoteResponse
+            {
+                Errors = new ArrayOfErrorMessageErrorMessage1 {
+                    new ErrorMessage {
+                        Description = "Error"
+                    }
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.CalculatedQuoteByQuoteNumber("5096");
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, "5096");
+            Assert.AreEqual(quote.Id, 0);
+        }
+
+        [TestMethod]
+        public void CalculatedQuoteByQuoteNumber_AssertEmptyDeductionsReutrn()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.CalculatedQuoteByQuoteNumber(It.IsAny<string>())).Returns(new CalculatedQuoteResponse
+            {
+                    ResponseData = new CalculatedQuote {
+                        QuoteDeductionList = null,
+                        BasePrice = 11,
+                        SuggestedQuoteAmount = 12,
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.CalculatedQuoteByQuoteNumber("5096");
+            //Assert
+            Assert.AreEqual(quote.BasePrice, 11);
+            Assert.AreEqual(quote.DeductionAmount, 0);
+        }
+
+        [TestMethod]
+        public void CalculatedQuoteByQuoteNumber_AssertDeductionamountReutrn()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.CalculatedQuoteByQuoteNumber(It.IsAny<string>())).Returns(new CalculatedQuoteResponse
+            {
+                ResponseData = new CalculatedQuote
+                {
+                    QuoteDeductionList = new QuoteDeductionList
+                    {
+                        SumOfAllDeductions = 150
+                    },
+                }
+            });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.CalculatedQuoteByQuoteNumber("5096");
+            //Assert
+            Assert.AreEqual(quote.QuoteNumber, "5096");
+            Assert.AreEqual(quote.DeductionAmount, 150);
+        }
+
+        [TestMethod]
+        public void SearchFollowUpQuote_AssertQuoteReturned()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.SearchFollowUpQuote(It.IsAny<SearchFollowUpReasonRequest>())).Returns(new QuoteListResponse {
+                    ResponseData = new QuoteList {
+                        Quotes = new ArrayOfQuoteQuote {
+                            new Quote {
+                                ID = 1,
+                                QuoteNumber = "5096"
+                            }
+                        }
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.SearchFollowUpQuote(new QuoteFollowUpEntity());
+            //Assert
+            Assert.AreEqual(quote.First().QuoteNumber, "5096");
+        }
+
+        [TestMethod]
+        public void SearchFollowUpQuote_AssertErrorsReturnEmptyQuote()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.SearchFollowUpQuote(It.IsAny<SearchFollowUpReasonRequest>())).Returns(new QuoteListResponse
+            {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "Error"
+                        }
+                    }
+                });
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            //Act
+            var quote = _quote.SearchFollowUpQuote(new QuoteFollowUpEntity());
+            //Assert
+            Assert.AreEqual(quote.Count, 0);
+        }
+
+        [TestMethod]
+        public void GetStatusList_QuoteStatusList1_AssertListCount1()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteStatusList()).Returns(new QuoteStatusListResponse {
+                ResponseData = new QuoteStatusList {
+                    QuoteStatuses = new ArrayOfQuoteStatusQuoteStatus {
+                        new QuoteStatus {
+                            StatusCode = "Hello",
+                        }
+                    }
+                }
+            });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            
+            //Act
+            var quote = _quote.GetStatusList();
+            
+            //Assert
+            Assert.AreEqual(quote.Count, 1);
+        }
+
+        [TestMethod]
+        public void GetQuoteSchedulesByQuoteNumber_QuoteSchedulesNull_AssertEmptyList()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteSchedulesByQuoteNumber(It.IsAny<string>()))
+                .Returns(new QuoteScheduleListResponse {
+                        ResponseData = new QuoteScheduleList
+                        {
+                            QuoteSchedules = null
+                        }
+            });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+
+            //Act
+            var quote = _quote.GetQuoteSchedulesByQuoteNumber("1231");
+
+            //Assert
+            Assert.AreEqual(quote.Count, 0);
+        }
+
+        [TestMethod]
+        public void GetQuoteSchedulesByQuoteNumber_ResponseErrors_AssertEmptyList()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteSchedulesByQuoteNumber(It.IsAny<string>()))
+                .Returns(new QuoteScheduleListResponse {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "test"
+                        }
+                    }
+                });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+
+            //Act
+            var quote = _quote.GetQuoteSchedulesByQuoteNumber("1231");
+
+            //Assert
+            Assert.AreEqual(quote.Count, 0);
+        }
+
+        [TestMethod]
+        public void GetQuoteSchedulesByQuoteNumber_QuoteSchedules1_AssertCorrectQuoteSchedule()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.GetQuoteSchedulesByQuoteNumber(It.IsAny<string>()))
+                .Returns(new QuoteScheduleListResponse {
+                    ResponseData = new QuoteScheduleList {
+                        QuoteSchedules = new ArrayOfQuoteScheduleQuoteSchedule {
+                            new QuoteSchedule {
+                                Contact = new Contact {
+                                    FirstName = "Matt",
+                                    LastName = "Holt"
+                                },
+                                TowCompany = new TowCompany {
+                                    CompanyName = "LKQ1"
+                                },
+                                StartHour = "0700",
+                                EndHour = "0800",
+                                ID = 2,
+                                CashAmountTendered = 123,
+                                ContactID = 1,
+                                QuoteID = 1,
+                                ProgramID = 2,
+                                Address1 = "1334 Glenn Ave",
+                                City = "Lewisburg",
+                                DestinationYardID = 6,
+                                DispatchStatusCode = "adada",
+                                DispatchReasonCode = "adsad",
+
+                            }
+                        }
+                    }
+                });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+
+            //Act
+            var result = _quote.GetQuoteSchedulesByQuoteNumber("1231");
+
+            //Assert
+            Assert.AreEqual(result.First().MilitaryWindow, "07000800");
+        }
+
+        [TestMethod]
+        public void AddUpdateQuoteSchedule_Success_AssertQuoteScheduleReturned()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.AddUpdateQuoteSchedule(It.IsAny<QuoteSchedule>()))
+                .Returns(new QuoteScheduleResponse {
+                  ResponseData  = new QuoteSchedule {
+                      Address1 = "123"
+                  }
+                });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+
+            //Act
+            var result = _quote.AddUpdateQuoteSchedule(new QuoteScheduleEntity { StartHour = "0800", EndHour = "1100" });
+
+            //Assert
+            Assert.AreEqual(result.Address1, "123");
+        }
+
+        [TestMethod]
+        public void AddUpdateQuoteSchedule_ResponseErrors_AssertNewEntity()
+        {
+            //Arrange
+            _mockQuoteService.Setup(m => m.AddUpdateQuoteSchedule(It.IsAny<QuoteSchedule>()))
+                .Returns(new QuoteScheduleResponse {
+                    Errors = new ArrayOfErrorMessageErrorMessage1 {
+                        new ErrorMessage {
+                            Description = "test"
+                        }
+                    }
+                });
+
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+
+            //Act
+            var result = _quote.AddUpdateQuoteSchedule(new QuoteScheduleEntity{StartHour = "0800",EndHour = "1100"});
+
+            //Assert
+            Assert.AreEqual(result.Id, 0);
+        }
+
+        [TestMethod]
+        public void PopulateQuoteScheduleEntities_AssertPaymentTypeCash_MiltaryWindow_QuoteScheduleId()
+        {
+            //Arrange
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            var list = new List<QuoteScheduleEntity>
+            {
+                new QuoteScheduleEntity
+                {
+                    Contact = new ContactEntity() {
+                        FirstName = "Matt",
+                        LastName = "Holt"
+                    },
+                    TowCompany = new TowCompanyEntity() {
+                        CompanyName = "LKQ1"
+                    },
+                    StartHour = "0700",
+                    EndHour = "0800",
+                    Id = 2,
+                    CashAmountTendered = 123
+                }
+            };
+
+            //Act
+            var result = _quote.PopulateQuoteScheduleEntities(list);
+
+            //Assert
+            Assert.AreEqual(result.First().PaymentType, "Cash");
+            Assert.AreEqual(result.First().TowCompanyName, null);
+            Assert.AreEqual(result.First().ContactName, null);
+            Assert.AreEqual(result.First().MilitaryWindow, "07000800");
+            Assert.AreEqual(result.First().QuoteScheduleId, 2);
+        }
+
+        [TestMethod]
+        public void PopulateQuoteScheduleEntities_AssertPaymentTypeCheck_ContactName_TowCompanyName()
+        {
+            //Arrange
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            var list = new List<QuoteScheduleEntity>
+            {
+                new QuoteScheduleEntity
+                {
+                    Contact = new ContactEntity() {
+                        FirstName = "Matt",
+                        LastName = "Holt"
+                    },
+                    TowCompany = new TowCompanyEntity() {
+                        CompanyName = "LKQ1"
+                    },
+                    StartHour = "0700",
+                    EndHour = "0800",
+                    Id = 2,
+                    CashAmountTendered = 0,
+                    TowCompanyId = 4,
+                    CheckNumber = "321"
+                }
+            };
+
+            //Act
+            var result = _quote.PopulateQuoteScheduleEntities(list);
+
+            //Assert
+            Assert.AreEqual(result.First().PaymentType, "Check");
+            Assert.AreEqual(result.First().TowCompanyName, "LKQ1");
+            Assert.AreEqual(result.First().ContactName, "Matt Holt");
+        }
+
+        [TestMethod]
+        public void PopulateQuoteScheduleEntities_AssertPaymentTypeBlank()
+        {
+            //Arrange
+            _quote = new QuoteManager(_mockVehicleStandardization.Object, _mockQuoteService.Object);
+            var list = new List<QuoteScheduleEntity>
+            {
+                new QuoteScheduleEntity
+                {
+                    Contact = new ContactEntity() {
+                        FirstName = "Matt",
+                        LastName = "Holt"
+                    },
+                    TowCompany = new TowCompanyEntity() {
+                        CompanyName = "LKQ1"
+                    },
+                    StartHour = "0700",
+                    EndHour = "0800",
+                    Id = 2,
+                    TowCompanyId = 4,
+                }
+            };
+
+            //Act
+            var result = _quote.PopulateQuoteScheduleEntities(list);
+
+            //Assert
+            Assert.AreEqual(result.First().PaymentType, "");
+        }
+    }
+}
