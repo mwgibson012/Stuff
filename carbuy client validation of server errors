@@ -1,0 +1,53 @@
+(function (carBuy, $, undefined) {
+    //works with unobtrusive validation to handle manually generated validation errors.
+    //call initializeValidation to setup and start error handling.
+    carBuy.Validation = function () {
+        /*initializes the error handling.  
+            idAndMessageArray:  key=rule, value=error message*/
+        var init = function (serverErrors) {
+            $("#customValidationList li").remove();
+            $("div[id^='customErrorDiv_']").remove();
+            
+            if ($.isEmptyObject(serverErrors)) return;
+            $.each(serverErrors, function (key, value) {
+                $("#customValidationList").append("<li data-customvalidationrule='customLiError_" + key + "' style='font:red'>" + value + "</li>");
+                mapToElement(key, value);
+            });
+        };
+
+        var mapToElement = function (rule, errorMsg) {
+            $("[data-customvalidationrule]").each(function (idx) {
+                var id = $(this).attr("id");
+                var elementRule = $(this).attr("data-customvalidationrule");
+                if (rule == elementRule) {
+                    $(this).after("<div id='customErrorDiv_" + id + "' > <span style='color:red'> " + errorMsg + "</span></div>");
+                }
+            });
+
+            //fix/hack for bug in custom html helpers
+            $("[data_customvalidationrule]").each(function (idx) {
+                var id = $(this).attr("id");
+                var elementRule = $(this).attr("data_customvalidationrule");
+                if (rule == elementRule) {
+                    $(this).after("<div id='customErrorDiv_" + id + "' > <span style='color:red'> " + errorMsg + "</span></div>");
+                }
+            });
+        };
+        //
+        //removes an error from a specified element
+        //elementId:  id of element whose error is to be removed  
+        //Ex: "YardObject_Id"  [NOT: "#YardObject_Id" or $("#YardObject_Id)]
+        var clearError = function (elementId) {
+            var div = "#customErrorDiv_" + elementId;
+            var rule = $("#"+elementId).attr("data-customvalidationrule");
+            var li = "li[data-customvalidationrule$='" + rule + "']";
+            $(li).remove();
+            $(div).remove();
+        };
+
+        return {
+            removeElementError: clearError,
+            initializeValidation: init
+        };
+    }();
+})(window.carBuy = window.carBuy, jQuery);
