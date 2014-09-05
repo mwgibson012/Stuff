@@ -1,4 +1,4 @@
-Enter file contents here(function (carBuy, $, undefined) {
+(function (carBuy, $, undefined) {
     /*
     required to load scripts
 
@@ -282,10 +282,48 @@ Enter file contents here(function (carBuy, $, undefined) {
                 }
         };
 
+        //given an address, this call google to get latitude and longitude.   then it populates latitude and longitude html elements
+        //address:  address to find
+        //latitudeElementId:  id of latitude element which will receive the latitude of the given address
+        //longitudeElementId: id of longitude element which will receive the longitude of the given address.
+        var setLatitudeAndLongitude=function(address, latitudeElementId, longitudeElementId) {
+            changeText(latitudeElementId, "0");
+            changeText(longitudeElementId, "0");
+
+            //call google api
+            var geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ 'address': address }, function (results, status) {
+                if (status == google.maps.GeocoderStatus.OK) {
+                    var latitude = results[0].geometry.location.lat();
+                    var longitude = results[0].geometry.location.lng();
+                    if (latitude == undefined || isNaN(latitude)) {
+                        latitude = "-1";
+                    }
+                    if (longitude == undefined || isNaN(longitude)) {
+                        longitude = "-1";
+                    }
+                    changeText(latitudeElementId, latitude);
+                    changeText(longitudeElementId, longitude);
+                } else {
+                    carBuy.setMainDisplay("Could not determine latitude and longitude for the given yard address.", false);
+                }
+            });
+        };
+        //set val or html of jquery wrapped element
+        function changeText(selector, text) {
+            var ctrl = $("#" + selector);
+            if (ctrl.is('input:text')) {
+                ctrl.val(text);
+            } else {
+                ctrl.html(text);
+            }
+        }
+
         //return functions
         return {
             setDistancesToAllYardsByPostalCode: setDistancesToAllYardsByPostalCode,
-            getDistanceFromOriginToDestination: getDistanceFromOriginToDestination
+            getDistanceFromOriginToDestination: getDistanceFromOriginToDestination,
+            setLatitudeAndLongitudeElements: setLatitudeAndLongitude
         };
         //end google api
     }();
